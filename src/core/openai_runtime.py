@@ -62,15 +62,24 @@ class OpenAIRunner:
             return block_msg
 
         client = self._client()
-        completion = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": agent.instruction},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=self.temperature,
-        )
-        text = (completion.choices[0].message.content or "").strip()
+        import asyncio
+        text = ""
+        for attempt in range(6):
+            try:
+                completion = client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": agent.instruction},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=self.temperature,
+                )
+                text = (completion.choices[0].message.content or "").strip()
+                break
+            except Exception:
+                if attempt == 5:
+                    raise
+                await asyncio.sleep(2.0 * (attempt + 1))
 
         for hook in self.output_hooks:
             text = hook(text)
